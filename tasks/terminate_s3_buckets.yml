@@ -1,0 +1,52 @@
+- name: Create S3 bucket {{ s3_buckets[bucket_name].name }}
+  s3_bucket:
+    name: "{{ item }}"
+    state: absent
+    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+  with_items: "{{ s3_buckets[bucket_name].name | default({}) }}"
+  register: delete_bucket
+
+- debug:
+    var: delete_bucket
+
+#- name: Look for bucket policy file
+#  set_fact:
+#    s3_bucket_bucket_policy_json: "{{ lookup('template', item, convert_data=False ) | string }}"
+#  with_first_found:
+#    - files:
+#        - "s3-bucket-policy-{{ bucket_name }}.json"
+#        - "s3-bucket-policy.json"
+#      paths:
+#        - "{{role_path}}/templates"
+#
+#
+#- set_fact:
+#    logging_bucket_profile: "{{ s3_buckets[s3_buckets[bucket_name].logging_bucket].profile | default(aws_account_name) }}"
+#  when: s3_buckets[bucket_name].logging_bucket|default("") != ""
+#
+#- set_fact:
+#    logging_bucket_profile: "{{aws_account_name}}"
+#  when: s3_buckets[bucket_name].logging_bucket|default("") == ""
+#
+#- name: Enable bucket logging for {{ s3_buckets[bucket_name].name }}
+#  s3_logging:
+#    name: "{{ s3_buckets[bucket_name].name }}"
+#    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+#    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+#    target_bucket: "{{ s3_buckets[s3_buckets[bucket_name].logging_bucket].name }}"
+#    target_prefix: "{{ s3_buckets[bucket_name].logging_prefix }}"
+#    state: present
+#  when: s3_buckets[bucket_name].logging_required and s3_buckets[bucket_name].profile | default(aws_account_name)  == logging_bucket_profile
+#
+#- name: Set bucket lifecycle for {{ s3_buckets[bucket_name].name }}
+#  s3_lifecycle:
+#    name: "{{ s3_buckets[bucket_name].name }}"
+#    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+#    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+#    transition_days: "{{ s3_buckets[bucket_name].transition_days }}"
+#    expiration_days: "{{ s3_buckets[bucket_name].expiration_days }}"
+#    #prefix: "/logs/"
+#    status: enabled
+#    state: present
+#  when: "{{ s3_buckets[bucket_name].enable_lifecycle | default(False) }}"--

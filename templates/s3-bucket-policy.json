@@ -1,0 +1,15 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AddPerm",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].id }}:root"},
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::{{s3_buckets[bucket_name].name}}/*",
+        "arn:aws:s3:::{{s3_buckets[bucket_name].name}}"
+      ]
+    }
+  ]
+}

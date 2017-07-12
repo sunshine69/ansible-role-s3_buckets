@@ -1,0 +1,68 @@
+- name: Look for bucket policy file
+  set_fact:
+    s3_bucket_bucket_policy_json: "{{ lookup('template', item, convert_data=False ) | string }}"
+  with_first_found:
+    - files:
+        - "s3-bucket-policy-{{ bucket_name }}.json"
+        - "s3-bucket-policy.json"
+      paths:
+        - "{{role_path}}/templates"
+
+- name: Create S3 bucket {{ s3_buckets[bucket_name].name }}
+  s3_bucket:
+    name: "{{ item }}"
+    state: present
+    policy: "{{ s3_bucket_bucket_policy_json }}"
+    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+    versioning: "{{ s3_buckets[bucket_name].versioning | default(True) }}"
+  with_items: "{{ s3_buckets[bucket_name].name | default({}) }}"
+  register: created_bucket
+
+- set_fact:
+    logging_bucket_profile: "{{ s3_buckets[s3_buckets[bucket_name].logging_bucket].profile | default(aws_account_name) }}"
+  when: s3_buckets[bucket_name].logging_bucket|default("")
+
+- set_fact:
+    logging_bucket_profile: "{{aws_account_name}}"
+  when: not s3_buckets[bucket_name].logging_bucket|default("")
+
+- name: Enable bucket logging for {{ s3_buckets[bucket_name].name }}
+  s3_logging:
+    name: "{{ s3_buckets[bucket_name].name }}"
+    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+    target_bucket: "{{ s3_buckets[s3_buckets[bucket_name].logging_bucket].name }}"
+    target_prefix: "{{ s3_buckets[bucket_name].logging_prefix }}"
+    state: present
+  when: s3_buckets[bucket_name].logging_required and s3_buckets[bucket_name].profile | default(aws_account_name)  == logging_bucket_profile
+
+- name: Set bucket lifecycle for {{ s3_buckets[bucket_name].name }}
+  s3_lifecycle:
+    name: "{{ s3_buckets[bucket_name].name }}"
+    profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+    region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+    transition_days: "{{ s3_buckets[bucket_name].transition_days }}"
+    expiration_days: "{{ s3_buckets[bucket_name].expiration_days }}"
+    #prefix: "/logs/"
+    status: enabled
+    state: present
+  when: s3_buckets[bucket_name].enable_lifecycle | default(False)
+
+- name: Set fact logging_bucket_events_per_profile_item
+  set_fact:
+    logging_bucket_events_per_profile_item:
+      id: "send-data-to-logstash-{{ item }}"
+      prefix: "{{ item }}/"
+      events:  ['s3:ObjectCreated:Put']
+      lambda_function_arn: "arn:aws:lambda:{{ s3_buckets[bucket_name].region | default(region) }}:{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].id }}:function:send-data-to-logstash-from-s3"
+  with_items: "{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].envs.keys() }}"
+  register: item_result
+
+- name: Set fact logging_bucket_events_per_profile to be used for bucket event
+  set_fact:
+    logging_bucket_events_per_profile: "{{ item_result.results | map(attribute='ansible_facts.logging_bucket_events_per_profile_item') | list }}"
+
+- debug:
+    var: logging_bucket_events_per_profile
+    verbosity: 2
