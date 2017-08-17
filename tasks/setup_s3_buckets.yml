@@ -6,6 +6,7 @@
         - "s3-bucket-policy-{{ bucket_name }}.json"
         - "s3-bucket-policy.json"
       paths:
+        - "{{ role_path }}/../../variable_files/s3_buckets"
         - "{{role_path}}/templates"
 
 - name: Create S3 bucket {{ s3_buckets[bucket_name].name }}
