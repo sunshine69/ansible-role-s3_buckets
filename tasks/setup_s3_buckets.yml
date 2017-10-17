@@ -43,8 +43,8 @@
     name: "{{ s3_buckets[bucket_name].name }}"
     profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
     region: "{{ s3_buckets[bucket_name].region | default(region) }}"
-    transition_days: "{{ s3_buckets[bucket_name].transition_days }}"
-    expiration_days: "{{ s3_buckets[bucket_name].expiration_days }}"
+    transition_days: "{{ s3_buckets[bucket_name].transition_days|default(omit) }}"
+    expiration_days: "{{ s3_buckets[bucket_name].expiration_days|default(omit) }}"
     #prefix: "/logs/"
     status: enabled
     state: present
