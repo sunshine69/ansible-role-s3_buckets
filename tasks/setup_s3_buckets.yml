@@ -58,7 +58,7 @@
           prefix: "{{ item }}/"
           events:  ['s3:ObjectCreated:Put']
           lambda_function_arn: "arn:aws:lambda:{{ s3_buckets[bucket_name].region | default(region) }}:{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].id }}:function:send-data-to-logstash-from-s3"
-      with_items: "{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].envs.keys() }}"
+      with_items: "{{ aws[s3_buckets[bucket_name].profile|default(aws_account_name)].envs|default({}) }}"
       register: item_result
 
     - name: Set fact logging_bucket_events_per_profile to be used for bucket event
