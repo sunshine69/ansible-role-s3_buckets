@@ -69,3 +69,31 @@
         var: logging_bucket_events_per_profile
         verbosity: 2
   when: aws[s3_buckets[bucket_name].profile|default(aws_account_name)].envs|default([])
+
+- block:
+    - name: Get a tempfile
+      tempfile:
+        state: file
+      register: tempfile
+
+    - name: Template the index file
+      template:
+        src: "list-object-index.html.j2"
+        dest: "{{ tempfile.path }}"
+
+    - name: Upload the index.html page for listing object
+      aws_s3:
+        profile: "{{ profile|default(omit) }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ sts_creds.access_key|default(omit) }}"
+        aws_secret_key: "{{ sts_creds.secret_key|default(omit) }}"
+        security_token: "{{ sts_creds.session_token|default(omit) }}"
+        mode: put
+        object: index.html
+        src: "{{ tempfile.path }}"
+
+    - name: Clean up tempfile
+      file:
+        path: "{{ tempfile.path }}"
+        state: absent
+  when: s3_buckets[bucket_name].enable_listing_index_page|default()
