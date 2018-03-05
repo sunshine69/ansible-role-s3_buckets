@@ -1,3 +1,17 @@
+- include_role:
+    name: aws_profile_account
+  vars:
+    aws_profile_account_role_arn: "arn:aws:iam::{{ aws[aws_account_name].id }}:role/AMIBuilder"
+    aws_profile_account_role_session_name: "s3_buckets role"
+    aws_profile_account_region: "{{ aws[aws_account_name].region }}"
+  when: not profile|default()
+
+- name: set credentials fact
+  set_fact:
+    sts_creds: "{{ (sts_result|default({})).sts_creds|default({}) }}"
+  no_log: yes
+  when: not profile|default()
+
 - name: Look for bucket policy file
   set_fact:
     s3_bucket_bucket_policy_json: "{{ lookup('template', item, convert_data=False ) | string }}"
@@ -16,6 +30,9 @@
     policy: "{{ s3_bucket_bucket_policy_json }}"
     region: "{{ s3_buckets[bucket_name].region | default(region) }}"
     profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
+    aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
+    aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
+    security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
     versioning: "{{ s3_buckets[bucket_name].versioning | default(True) }}"
   with_items: "{{ s3_buckets[bucket_name].name | default({}) }}"
   register: created_bucket
@@ -33,6 +50,9 @@
     name: "{{ s3_buckets[bucket_name].name }}"
     profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
     region: "{{ s3_buckets[bucket_name].region | default(region) }}"
+    aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
+    aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
+    security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
     target_bucket: "{{ s3_buckets[s3_buckets[bucket_name].logging_bucket].name }}"
     target_prefix: "{{ s3_buckets[bucket_name].logging_prefix }}"
     state: present
@@ -43,12 +63,15 @@
     name: "{{ s3_buckets[bucket_name].name }}"
     profile: "{{ s3_buckets[bucket_name].profile | default(aws_account_name) }}"
     region: "{{ s3_buckets[bucket_name].region | default(region) }}"
-    transition_days: "{{ s3_buckets[bucket_name].transition_days|default(omit) }}"
-    expiration_days: "{{ s3_buckets[bucket_name].expiration_days|default(omit) }}"
-    #prefix: "/logs/"
+    aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
+    aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
+    security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
+    transition_days: "{{ s3_buckets[bucket_name].lifecycle.transition_days|default(omit) }}"
+    expiration_days: "{{ s3_buckets[bucket_name].lifecycle.expiration_days|default(omit) }}"
+    prefix: "{{ s3_buckets[bucket_name].lifecycle.prefix|default(omit) }}"
     status: enabled
     state: present
-  when: s3_buckets[bucket_name].enable_lifecycle | default(False)
+  when: s3_buckets[bucket_name].lifecycle | default()
 
 - block:
     - name: Set fact logging_bucket_events_per_profile_item
@@ -70,6 +93,7 @@
         verbosity: 2
   when: aws[s3_buckets[bucket_name].profile|default(aws_account_name)].envs|default([])
 
+# Deploy listing_index_page if enable_listing_index_page
 - block:
     - name: Get a tempfile
       tempfile:
@@ -85,15 +109,32 @@
       aws_s3:
         profile: "{{ profile|default(omit) }}"
         region: "{{ region }}"
-        aws_access_key: "{{ sts_creds.access_key|default(omit) }}"
-        aws_secret_key: "{{ sts_creds.secret_key|default(omit) }}"
-        security_token: "{{ sts_creds.session_token|default(omit) }}"
+        aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
+        aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
+        security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
+        bucket: "{{ s3_buckets[bucket_name].name }}"
         mode: put
         object: index.html
         src: "{{ tempfile.path }}"
+        metadata: 'Content-Type=text/html'
 
     - name: Clean up tempfile
       file:
         path: "{{ tempfile.path }}"
         state: absent
   when: s3_buckets[bucket_name].enable_listing_index_page|default()
+
+# Configure website
+- name: Enable website
+  s3_website:
+        profile: "{{ profile|default(omit) }}"
+        region: "{{ region }}"
+        aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
+        aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
+        security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
+        name: "{{ s3_buckets[bucket_name].name }}"
+        error_key: "{{ s3_buckets[bucket_name].website.error_key|default(omit) }}"
+        redirect_all_requests: "{{ s3_buckets[bucket_name].website.redirect_all_requests|default(omit) }}"
+        suffix: "{{ s3_buckets[bucket_name].website.suffix|default(omit) }}"
+        state: "{{ s3_buckets[bucket_name].website.state|default('present') }}"
+  when: s3_buckets[bucket_name].website|default()
