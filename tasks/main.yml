@@ -1,4 +1,1 @@
----
-
-- { include_tasks: setup_s3_buckets.yml, when: stage != "delete" and action_type == "bucket" }
-- { include_tasks: terminate_s3_buckets.yml, when: stage == "delete" }
+- include_tasks: "{{ stage }}-s3_buckets.yml"
