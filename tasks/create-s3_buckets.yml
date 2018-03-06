@@ -66,11 +66,12 @@
     aws_access_key: "{{ (sts_creds|default()).access_key|default(omit) }}"
     aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
     security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
-    transition_days: "{{ s3_buckets[bucket_name].lifecycle.transition_days|default(omit) }}"
-    expiration_days: "{{ s3_buckets[bucket_name].lifecycle.expiration_days|default(omit) }}"
-    prefix: "{{ s3_buckets[bucket_name].lifecycle.prefix|default(omit) }}"
+    transition_days: "{{ item.transition_days|default(omit) }}"
+    expiration_days: "{{ item.expiration_days|default(omit) }}"
+    prefix: "{{ lifecycle.prefix|default(omit) }}"
     status: enabled
     state: present
+  with_items: "{{ s3_buckets[bucket_name].lifecycle }}"
   when: s3_buckets[bucket_name].lifecycle | default()
 
 - block:
