@@ -10,6 +10,10 @@
       "Resource": "arn:aws:s3:::{{ s3_buckets[bucket_name].name }}/*",
       "Principal": {
         "AWS": [
+{# Base on this guide for the origin of the number 783225319266 used in the template file
+http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-access-logs.html.
+This is for grants Elastic Load Balancing permission to write to the bucket
+#}
           "783225319266"
         ]
       }
