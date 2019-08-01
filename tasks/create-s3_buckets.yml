@@ -12,6 +12,9 @@
   no_log: yes
   when: not profile|default()
 
+- debug:
+    msg: " bucket key name: {{ bucket_name }}. Note this is not the real name of the bucket, it is the key to lookup in the s3_buckets var"
+
 - name: Look for bucket policy file
   set_fact:
     s3_bucket_bucket_policy_json: "{{ lookup('template', item, convert_data=False ) | string }}"
@@ -25,7 +28,7 @@
 
 - name: Create S3 bucket {{ s3_buckets[bucket_name].name }}
   s3_bucket:
-    name: "{{ item }}"
+    name: "{{ s3_buckets[bucket_name].name }}"
     state: present
     policy: "{{ s3_bucket_bucket_policy_json }}"
     region: "{{ s3_buckets[bucket_name].region | default(region) }}"
@@ -34,7 +37,7 @@
     aws_secret_key: "{{ (sts_creds|default()).secret_key|default(omit) }}"
     security_token: "{{ (sts_creds|default()).session_token|default(omit) }}"
     versioning: "{{ s3_buckets[bucket_name].versioning | default(True) }}"
-  with_items: "{{ s3_buckets[bucket_name].name | default({}) }}"
+  when: not (s3_buckets[bucket_name].state|default('noskip') in ['skip', 'ignore', 'absent'])
   register: created_bucket
 
 - set_fact:
